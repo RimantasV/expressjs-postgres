@@ -1,6 +1,7 @@
 import express from 'express';
 import pg from 'pg';
 import cors from 'cors';
+import bodyParser from 'body-parser';
 
 const pool = new pg.Pool({
   user: 'postgres',
@@ -11,17 +12,33 @@ const pool = new pg.Pool({
 });
 const app = express();
 const port = process.env.PORT || 3333;
+app.use(bodyParser.json());
+app.use(
+  bodyParser.urlencoded({
+    extended: true,
+  })
+);
 app.use(cors());
 
 app.get('/', async (req, res) => {
   const { rows } = await pool.query('SELECT * from results');
-  let resultString = '<ul>';
-  rows.forEach(
-    (row) =>
-      (resultString += `<li>${row.player1} ${row.player1score}:${row.player2score} ${row.player2}</li>`)
+
+  res.send(rows);
+});
+
+app.post('/', async (req, res) => {
+  const { player1, player2, player1score, player2score, date } = req.body;
+
+  pool.query(
+    'INSERT INTO results (player1, player2, player1score, player2score, date) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+    [player1, player2, player1score, player2score, date],
+    (error, results) => {
+      if (error) {
+        throw error;
+      }
+      res.status(201).send(results.rows[0]);
+    }
   );
-  resultString += '</ul>';
-  res.send(resultString);
 });
 
 app.listen(port, () => {
