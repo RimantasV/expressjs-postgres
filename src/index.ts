@@ -1,5 +1,6 @@
 import express from 'express';
 import pg from 'pg';
+import cors from 'cors';
 
 const pool = new pg.Pool({
   user: 'postgres',
@@ -10,6 +11,7 @@ const pool = new pg.Pool({
 });
 const app = express();
 const port = process.env.PORT || 3333;
+app.use(cors());
 
 app.get('/', async (req, res) => {
   const { rows } = await pool.query('SELECT * from results');
