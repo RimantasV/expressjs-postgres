@@ -20,12 +20,14 @@ app.use(
 );
 app.use(cors());
 
+// get all results
 app.get('/', async (req, res) => {
   const { rows } = await pool.query('SELECT * from results');
 
   res.send(rows);
 });
 
+// create new result
 app.post('/', async (req, res) => {
   const { player1, player2, player1score, player2score, date } = req.body;
 
@@ -39,6 +41,35 @@ app.post('/', async (req, res) => {
       res.status(201).send(results.rows[0]);
     }
   );
+});
+
+// update a result
+app.put('/:id', async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { player1, player2, player1score, player2score, date } = req.body;
+
+  pool.query(
+    'UPDATE results SET player1 = $1, player2 = $2, player1score = $3, player2score = $4, date = $5 WHERE id = $6',
+    [player1, player2, player1score, player2score, date, id],
+    (error, results) => {
+      if (error) {
+        throw error;
+      }
+      res.status(200).send(results.rows[0]);
+    }
+  );
+});
+
+// delete a result
+app.delete('/:id', async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  pool.query('DELETE from results WHERE id = $1', [id], (error, results) => {
+    if (error) {
+      throw error;
+    }
+    res.status(200).send(results.rows[0]);
+  });
 });
 
 app.listen(port, () => {
