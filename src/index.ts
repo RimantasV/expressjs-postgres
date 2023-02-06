@@ -2,6 +2,16 @@ import express from 'express';
 import pg from 'pg';
 import cors from 'cors';
 import bodyParser from 'body-parser';
+import dotenv from 'dotenv';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+dotenv.config();
+
+const generateToken = (id: string) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET as string, {
+    expiresIn: '30d',
+  });
+};
 
 const pool = new pg.Pool({
   user: 'postgres',
@@ -36,6 +46,7 @@ app.post('/', async (req, res) => {
     [player1, player2, player1score, player2score, date],
     (error, results) => {
       if (error) {
+        console.log(error);
         throw error;
       }
       res.status(201).send(results.rows[0]);
@@ -70,6 +81,75 @@ app.delete('/:id', async (req, res) => {
     }
     res.status(200).send(results.rows[0]);
   });
+});
+
+// register a user
+app.post('/users', (req, res) => {
+  const { name, email, password } = req.body;
+
+  if (!name || !email || !password) {
+    res.status(400).json({ error: 'Missing data' });
+  }
+
+  // check if user exists
+  // check if user exists
+  pool.query(
+    'SELECT email FROM users WHERE email = $1 ',
+    [email],
+    async (error, results) => {
+      if (error) {
+        res.status(400);
+        throw new Error('User already exists');
+      }
+      if (results.rowCount > 0) {
+        res.status(400).json({ message: 'User already exists' });
+      } else {
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+        pool.query(
+          'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) ',
+          [name, email, hashedPassword],
+          (error, results) => {
+            if (error) {
+              res.status(400).json({ message: 'failed to create a user' });
+            }
+            res.status(201).send(results.rows[0]);
+          }
+        );
+      }
+    }
+  );
+});
+
+// authenticate
+app.post('/users/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  pool.query(
+    'SELECT id, name, email, password FROM users WHERE email = $1 ',
+    [email],
+    async (error, results) => {
+      if (error) {
+        res.status(400).json({ message: 'error' });
+      } else {
+        console.log(results.rows[0]);
+        const user = results.rows[0];
+        if (user && (await bcrypt.compare(password, user.password))) {
+          res.json({
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            token: generateToken(user.id),
+          });
+        } else res.status(400).json({ message: 'error' });
+      }
+    }
+  );
+});
+
+// authenticate
+app.get('/users/me', (req, res) => {
+  res.json({ message: 'User data' });
 });
 
 app.listen(port, () => {
